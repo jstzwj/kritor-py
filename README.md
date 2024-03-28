@@ -16,7 +16,7 @@ from kritor.protos.auth.authentication_pb2_grpc import AuthenticationServiceStub
 
 with grpc.insecure_channel(self.target) as channel:
     stub = AuthenticationServiceStub(channel)
-    out = stub.Authenticate(AuthenticateRequest(account = account, ticket = ticket))
+    out = stub.Authenticate(AuthenticateRequest(account = "1145141919810", ticket = "A123456"))
     print(out.msg)
 ```
 

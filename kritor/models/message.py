@@ -2,6 +2,9 @@
 from typing import List
 from pydantic import BaseModel
 
-class SendMessageResponse(BaseModel):
-    message_id: str
-    message_time: int
+class Element(BaseModel):
+    kind: int
+
+class TextElement(BaseModel):
+    kind: int
+    text: str
