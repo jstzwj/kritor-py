@@ -11,7 +11,13 @@
 建立一个管道，实例化Grpc的服务，发送一个鉴权请求。
 
 ```python
+import grpc
+from kritor.protos.auth.authentication_pb2_grpc import AuthenticationServiceStub
 
+with grpc.insecure_channel(self.target) as channel:
+    stub = AuthenticationServiceStub(channel)
+    out = stub.Authenticate(AuthenticateRequest(account = account, ticket = ticket))
+    print(out.msg)
 ```
 
 ## 使用项目
