@@ -20,6 +20,29 @@ with grpc.insecure_channel(self.target) as channel:
     print(out.msg)
 ```
 
+## 机器人代码示例
+```python
+from kritor.app import KritorApp
+from kritor.connection.config import config
+from kritor.models import Friend
+
+app = KritorApp(config(verify_key="ServiceVerifyKey", account=123456789))
+
+
+@app.broadcast.receiver("FriendMessage")
+async def friend_message_listener(app: Ariadne, friend: Friend):
+    await app.send_message(friend, "Hello, World!")
+
+
+KritorApp.launch_blocking()
+```
+
+
 ## 使用项目
 
 - [Shamrock](https://github.com/whitechi73/OpenShamrock)
+
+## 致谢
+- [Shamrock](https://github.com/whitechi73/OpenShamrock)
+- [kritor](https://github.com/KarinJS/kritor)
+- [Ariadne](https://github.com/GraiaProject/Ariadne)

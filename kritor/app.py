@@ -1,13 +1,18 @@
 import asyncio
 import inspect
 import logging
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Union
 import uuid
 import grpc
 import time
 from concurrent import futures
 
+from graia.broadcast import Broadcast
+from graia.broadcast.interfaces.dispatcher import DispatcherInterface
+
+import kritor
 from kritor.handler import KritorHandler
+from kritor.models.options import KritorOptions
 from kritor.protos.common.contact_pb2 import Contact
 from kritor.protos.common.message_element_pb2 import Element, TextElement, AtElement
 
@@ -25,6 +30,7 @@ from kritor.protos.message.message_pb2 import SendMessageRequest, SendMessageRes
 
 from kritor.protos.event.event_pb2_grpc import EventServiceStub, EventServiceServicer, add_EventServiceServicer_to_server
 from kritor.protos.event.event_pb2 import RequestPushEvent, EventStructure, EventType
+from kritor.typing import class_property
 
 class KritorAsyncEventServiceServicer(EventServiceServicer):
     async def RegisterPassiveListener(self, request_iterator, context: grpc.aio.ServicerContext):
@@ -39,19 +45,45 @@ class KritorEventServiceServicer(EventServiceServicer):
         return RequestPushEvent(type=1)
         # raise NotImplementedError('Method not implemented!')
 
-class KritorBot(object):
-    def __init__(self, host: str, port: int, passive:bool = False, max_workers: int = 10) -> None:
+class KritorApp(object):
+    def __init__(self,
+                 account: str,
+                 ticket: str,
+                 host: str,
+                 port: int,
+                 server_host: Union[str]=None,
+                 server_port: Union[int]=None,
+                 passive:bool = False,
+                 max_workers: int = 10
+            ) -> None:
+        self.account = account
+        self.ticket = ticket
+
         self.host = host
         self.port = port
+
+        self.server_host = server_host
+        self.server_port = server_port
+
         self.passive = passive
         self.debug = True
         self.max_workers = max_workers
         self.target = f"{host}:{port}"
 
+        self.broadcast = Broadcast()
         self.event_handlers: Dict[str, List[KritorHandler]] = {}
         # Coroutines to be invoked when the event loop is shutting down.
         self._cleanup_coroutines = []
     
+    @class_property
+    def broadcast(cls) -> Broadcast:
+        """获取 Ariadne 的事件系统.
+
+        Returns:
+            Broadcast: 事件系统
+        """
+        return cls.broadcast
+
     def register_handler(self, event_name: str, handler: Callable[[Any], Any]) -> str:
         if event_name not in self.event_handlers:
             self.event_handlers[event_name] = []
@@ -149,25 +181,25 @@ class KritorBot(object):
                     event = next(core_event_iter)
                     self._call_event("core", args=[], kargs={})
                 except StopIteration:
-                    continue
+                    pass
                 
                 try:
                     event = next(message_event_iter)
                     self._call_event("message", args=[], kargs={"message": event.message})
                 except StopIteration:
-                    continue
+                    pass
                 
                 try:
                     event = next(notice_event_iter)
                     self._call_event("notice", args=[], kargs={"notice": event.notice})
                 except StopIteration:
-                    continue
+                    pass
                 
                 try:
                     event = next(request_event_iter)
                     self._call_event("request", args=[], kargs={"request": event.request})
                 except StopIteration:
-                    continue
+                    pass
 
                 time.sleep(0.1)
 
@@ -198,6 +230,17 @@ class KritorBot(object):
             await self._serve_passive()
         else:
             await self._aserve_active(host=host, port=port)
+    
+    def launch_blocking(self, sync=True):
+        if sync:
+            self.run(self.server_host, self.server_port)
+        else:
+            loop = asyncio.get_event_loop()
+            try:
+                loop.run_until_complete(self.arun(self.server_host, self.server_port))
+            finally:
+                loop.run_until_complete(*self._cleanup_coroutines)
+                loop.close()
     
     # Auth
     def auth(self, account: str, ticket: str) -> AuthenticateResponse:
