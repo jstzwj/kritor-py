@@ -330,7 +330,7 @@ class KritorApp(object):
             return out
     
     # Message
-    def send_message(self, target: Union[Friend, Group], message: Union[MessageChain, str], retry_count:int = 3) -> SendMessageResponse:
+    def send_message_sync(self, target: Union[Friend, Group], message: Union[MessageChain, str], retry_count:int = 3) -> SendMessageResponse:
         with grpc.insecure_channel(self.target) as channel:
             stub = MessageServiceStub(channel)
             contact = to_contact(target)
@@ -347,7 +347,7 @@ class KritorApp(object):
             )
             return out
 
-    async def asend_message(self, target: Union[Friend, Group], message: Union[MessageChain, str], retry_count:int = 3) -> SendMessageResponse:
+    async def send_message(self, target: Union[Friend, Group], message: Union[MessageChain, str], retry_count:int = 3) -> SendMessageResponse:
         async with grpc.aio.insecure_channel(self.target) as channel:
             stub = MessageServiceStub(channel)
             contact = to_contact(target)

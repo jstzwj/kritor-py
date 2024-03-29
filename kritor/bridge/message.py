@@ -1,14 +1,28 @@
-
-
 from datetime import datetime
 from typing import List, Union
 from kritor.message import Source
 from kritor.message.chain import MessageChain
 from kritor.message.element import Plain, At, AtAll
-from kritor.models.relationship import Client, Friend, Group, Member, Stranger, MemberPerm
+from kritor.models.relationship import (
+    Client,
+    Friend,
+    Group,
+    Member,
+    Stranger,
+    MemberPerm,
+)
 from kritor.protos.common.message_data_pb2 import PushMessageBody
-from kritor.protos.common.message_element_pb2 import Element, TextElement, AtElement, FaceElement
+from kritor.protos.common.message_element_pb2 import (
+    Element,
+    TextElement,
+    AtElement,
+    FaceElement,
+    BubbleFaceElement,
+    ReplyElement,
+    ImageElement,
+)
 from kritor.protos.common.contact_pb2 import Contact, Sender, Scene
+
 
 def to_contact(target: Union[Friend, Group]) -> Contact:
     if isinstance(target, Group):
@@ -18,16 +32,65 @@ def to_contact(target: Union[Friend, Group]) -> Contact:
     else:
         raise NotImplementedError()
 
+
 def to_message_chain(elements: List[Element]) -> MessageChain:
+    """这里有bug，kritor的element.type永远为0，这里workaround想办法
+
+    Args:
+        elements (List[Element]): _description_
+
+    Raises:
+        NotImplementedError: _description_
+
+    Returns:
+        MessageChain: _description_
+    """
     message_chain = MessageChain([])
     for element in elements:
-        if element.type == Element.ElementType.TEXT:
+        data_field = element.WhichOneof("data")
+        if data_field == "text":  # element.type == Element.ElementType.TEXT
             message_chain.content.append(Plain(text=element.text.text))
-        elif element.type == Element.ElementType.AT:
-            message_chain.content.append(At(target=element.at.uid))
+        elif data_field == "at":  # element.type == Element.ElementType.AT
+            message_chain.content.append(At(target=element.at.uin))
+        elif data_field == "face":  # element.type == Element.ElementType.FACE
+            message_chain.content.append(
+                FaceElement(
+                    target=element.face.id,
+                    is_big=element.face.is_big,
+                    result=element.face.result,
+                )
+            )
+        elif data_field == "bubble_face":  # element.type == Element.ElementType.BUBBLE_FACE
+            message_chain.content.append(
+                BubbleFaceElement(
+                    target=element.bubble_face.id,
+                    count=element.bubble_face.count,
+                )
+            )
+        elif data_field == "reply":  # element.type == Element.ElementType.REPLY
+            message_chain.content.append(
+                ReplyElement(
+                    message_id=element.reply.message_id,
+                )
+            )
+        elif data_field == "image":  # element.type == Element.ElementType.IMAGE
+            image_data_field = element.image.WhichOneof("data")
+            message_chain.content.append(
+                ImageElement(
+                    file=element.image.file if image_data_field == "file" else None,
+                    file_name=element.image.file_name if image_data_field == "file_name" else None,
+                    file_path=element.image.file_path if image_data_field == "file_path" else None,
+                    file_url=element.image.file_url if image_data_field == "file_url" else None,
+                    file_md5=element.image.file_md5,
+                    sub_type=element.image.sub_type,
+                    type=element.image.type,
+                )
+            )
         else:
-            raise NotImplementedError()
+            pass
+            # raise NotImplementedError()
     return message_chain
+
 
 def to_message(chain: MessageChain) -> List[Element]:
     message = MessageChain([])
@@ -40,27 +103,23 @@ def to_message(chain: MessageChain) -> List[Element]:
             raise NotImplementedError()
     return message
 
-def to_sender(contact: Contact, sender: Sender) -> Union[Friend, Member, Client, Stranger]:
+
+def to_sender(
+    contact: Contact, sender: Sender
+) -> Union[Friend, Member, Client, Stranger]:
     if contact.scene == Scene.GROUP:
-        group = Group(
-            id=int(contact.peer),
-            name="",
-            permission=MemberPerm.Member
-        )
+        group = Group(id=int(contact.peer), name="", permission=MemberPerm.Member)
         return Member(
             id=sender.uin,
             memberName=sender.nick,
             permission=MemberPerm.Member,
-            group=group
+            group=group,
         )
     elif contact.scene == Scene.FRIEND:
-        return Friend(
-            id=sender.uin, 
-            nickname=sender.nick, 
-            remark=""
-        )
+        return Friend(id=sender.uin, nickname=sender.nick, remark="")
     else:
         raise NotImplementedError()
+
 
 def to_source(message: PushMessageBody) -> Source:
     return Source(
