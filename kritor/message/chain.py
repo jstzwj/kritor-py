@@ -56,14 +56,9 @@ class MessageChain(BaseMessageChain, KritorBaseModel):
     即 "消息链", 被用于承载整个消息内容的数据结构, 包含有一有序列表, 包含有元素实例.
     """
 
-    root: List[Element]
+    content: List[Element] = []
     """底层元素列表"""
     
-    @property
-    def content(self) -> List[Element]:
-        """MessageChain 的内容代理"""
-        return self.root
-
     @staticmethod
     def build_chain(obj: Union[List[Dict], MessageContainer]) -> List[Element]:
         """内部接口, 会自动反序列化对象并生成.
@@ -133,13 +128,11 @@ class MessageChain(BaseMessageChain, KritorBaseModel):
             MessageChain: 创建的消息链
         """
         if not inline:
-            AriadneBaseModel.__init__(
-                self,
-                __root__=self.build_chain((__root__, *elements)),
-            )
+            KritorBaseModel.__init__(self)
+            self.content = self.build_chain((__root__, *elements))
         else:
-            AriadneBaseModel.__init__(self, __root__=[])
-            self.__root__ = __root__  # type: ignore
+            KritorBaseModel.__init__(self)
+            self.content = __root__  # type: ignore
 
     def __repr_args__(self) -> "ReprArgs":
         return [(None, list(self.content))]

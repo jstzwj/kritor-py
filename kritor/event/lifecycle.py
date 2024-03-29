@@ -1,8 +1,8 @@
 """Ariadne, Adapter 生命周期相关事件"""
 import typing
 
-from graia.broadcast.entities.event import Dispatchable
-from graia.broadcast.interfaces.dispatcher import DispatcherInterface
+from kritor.broadcast.entities.event import Dispatchable
+from kritor.broadcast.interfaces.dispatcher import DispatcherInterface
 
 from ..dispatcher import BaseDispatcher
 from ..typing import generic_issubclass
@@ -31,11 +31,11 @@ class ApplicationLifecycleEvent(Dispatchable):
 
 
 class ApplicationLaunch(ApplicationLifecycleEvent):
-    """指示 Ariadne 启动."""
+    """启动"""
 
 
 class ApplicationShutdown(ApplicationLifecycleEvent):
-    """指示 Ariadne 关闭."""
+    """关闭"""
 
 
 ApplicationLaunched = ApplicationLaunch

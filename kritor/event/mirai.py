@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 from pydantic import Field, root_validator
 from pydantic.fields import FieldInfo
 
-from graia.broadcast.entities.dispatcher import BaseDispatcher as AbstractDispatcher
-from graia.broadcast.interfaces.dispatcher import DispatcherInterface
+from kritor.broadcast.entities.dispatcher import BaseDispatcher as AbstractDispatcher
+from kritor.broadcast.interfaces.dispatcher import DispatcherInterface
 
 from ..dispatcher import (
     BaseDispatcher,
@@ -138,7 +138,7 @@ class FriendInputStatusChangedEvent(FriendEvent):
     inputting: bool
     """是否正在输入"""
 
-    dispatcher: BaseDispatcher = FriendDispatcher
+    Dispatcher: BaseDispatcher = FriendDispatcher
 
 class FriendNickChangedEvent(FriendEvent):
     """Bot 账号的某一好友更改了昵称.
@@ -162,7 +162,7 @@ class FriendNickChangedEvent(FriendEvent):
     to_name: str = Field(..., alias="to")
     """新昵称"""
 
-    dispatcher: BaseDispatcher = FriendDispatcher
+    Dispatcher: BaseDispatcher = FriendDispatcher
 
     @root_validator(skip_on_failure=True)
     def _(cls, values: Dict[str, Any]):
@@ -192,7 +192,7 @@ class BotGroupPermissionChangeEvent(GroupEvent, BotEvent):
     group: Group
     """权限改变所在的群信息"""
 
-    dispatcher: BaseDispatcher = GroupDispatcher
+    Dispatcher: BaseDispatcher = GroupDispatcher
 
 class BotMuteEvent(GroupEvent, BotEvent):
     """Bot 账号在一特定群组内被管理员/群主禁言
@@ -214,7 +214,7 @@ class BotMuteEvent(GroupEvent, BotEvent):
     operator: Member
     """执行禁言操作的管理员/群主"""
 
-    dispatcher: BaseDispatcher = OperatorDispatcher
+    Dispatcher: BaseDispatcher = OperatorDispatcher
 
 
 class BotUnmuteEvent(GroupEvent, BotEvent):
@@ -234,7 +234,7 @@ class BotUnmuteEvent(GroupEvent, BotEvent):
     operator: Member
     """操作的管理员或群主信息"""
 
-    dispatcher: BaseDispatcher = OperatorDispatcher
+    Dispatcher: BaseDispatcher = OperatorDispatcher
 
 
 class BotJoinGroupEvent(GroupEvent, BotEvent):
@@ -279,7 +279,7 @@ class BotLeaveEventActive(GroupEvent, BotEvent):
     group: Group
     """Bot 退出的群的信息"""
 
-    dispatcher: BaseDispatcher = GroupDispatcher
+    Dispatcher: BaseDispatcher = GroupDispatcher
 
 
 class BotLeaveEventKick(GroupEvent, BotEvent):
@@ -752,7 +752,7 @@ class MemberLeaveEventKick(GroupEvent):
     operator: Optional[Member]
     """执行了该操作的管理员/群主, 也可能是 Bot 账号"""
 
-    dispatcher: BaseDispatcher = OperatorMemberDispatcher
+    Dispatcher: BaseDispatcher = OperatorMemberDispatcher
 
 class MemberLeaveEventQuit(GroupEvent):
     """有一群组成员主动退出群组.
@@ -771,7 +771,7 @@ class MemberLeaveEventQuit(GroupEvent):
     member: Member
     """主动退出群组的成员"""
 
-    dispatcher: BaseDispatcher = MemberDispatcher
+    Dispatcher: BaseDispatcher = MemberDispatcher
 
 
 class MemberCardChangeEvent(GroupEvent):
@@ -804,7 +804,7 @@ class MemberCardChangeEvent(GroupEvent):
     operator: Optional[Member]
     """更改群名片的操作者, 可能是管理员/群主, 该成员自己, 也可能是 Bot 账号(这时, `operator` 为 `None`)."""
 
-    dispatcher: BaseDispatcher = OperatorMemberDispatcher
+    Dispatcher: BaseDispatcher = OperatorMemberDispatcher
 
 
 class MemberSpecialTitleChangeEvent(GroupEvent):
@@ -830,7 +830,7 @@ class MemberSpecialTitleChangeEvent(GroupEvent):
     member: Member
     """被更改头衔的群组成员"""
 
-    dispatcher: BaseDispatcher = MemberDispatcher
+    Dispatcher: BaseDispatcher = MemberDispatcher
 
 
 class MemberPermissionChangeEvent(GroupEvent):
@@ -856,7 +856,7 @@ class MemberPermissionChangeEvent(GroupEvent):
     member: Member
     """权限改动的群员的信息"""
 
-    dispatcher: BaseDispatcher = MemberDispatcher
+    Dispatcher: BaseDispatcher = MemberDispatcher
 
 
 class MemberMuteEvent(GroupEvent):
@@ -885,7 +885,7 @@ class MemberMuteEvent(GroupEvent):
     operator: Optional[Member]
     """该操作的执行者, 也可能是 Bot 账号"""
 
-    dispatcher: BaseDispatcher = OperatorMemberDispatcher
+    Dispatcher: BaseDispatcher = OperatorMemberDispatcher
 
 
 class MemberUnmuteEvent(GroupEvent):
@@ -913,7 +913,7 @@ class MemberUnmuteEvent(GroupEvent):
     operator: Optional[Member]
     """操作执行者, 可能是管理员或是群主, 也可能是 Bot 账号"""
 
-    dispatcher: BaseDispatcher = OperatorMemberDispatcher
+    Dispatcher: BaseDispatcher = OperatorMemberDispatcher
 
 
 class MemberHonorChangeEvent(GroupEvent):
@@ -939,7 +939,7 @@ class MemberHonorChangeEvent(GroupEvent):
     honor: str
     """获得/失去的荣誉"""
 
-    dispatcher: BaseDispatcher = MemberDispatcher
+    Dispatcher: BaseDispatcher = MemberDispatcher
 
 
 class RequestEvent(KritorEvent):

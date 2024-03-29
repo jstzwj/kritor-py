@@ -103,6 +103,8 @@ class Plain(Element, BaseText):
     text: str
     """实际的文本"""
 
+    style: str | None = None
+
     def __init__(self, text: str, **kwargs) -> None:
         """实例化一个 Plain 消息元素, 用于承载消息中的文字.
 

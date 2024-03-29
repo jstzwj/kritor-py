@@ -5,14 +5,20 @@ from typing import Any, Callable, ClassVar, Dict, List, Optional, Union
 import uuid
 import grpc
 import time
+from threading import Thread
 from concurrent import futures
 
-from graia.broadcast import Broadcast
-from graia.broadcast.interfaces.dispatcher import DispatcherInterface
+from kritor.bridge.message import to_message_chain, to_sender, to_source, to_contact, to_message
+
+from .broadcast import Broadcast
+from .broadcast.interfaces.dispatcher import DispatcherInterface
 
 import kritor
+from kritor.event.message import MessageEvent, FriendMessage, GroupMessage, StrangerMessage, TempMessage, OtherClientMessage
 from kritor.handler import KritorHandler
+from kritor.message.chain import MessageChain
 from kritor.models.options import KritorOptions
+from kritor.models.relationship import Friend, Member, Stranger, Group
 from kritor.protos.common.contact_pb2 import Contact
 from kritor.protos.common.message_element_pb2 import Element, TextElement, AtElement
 
@@ -70,51 +76,19 @@ class KritorApp(object):
         self.max_workers = max_workers
         self.target = f"{host}:{port}"
 
-        self.broadcast = Broadcast()
-        self.event_handlers: Dict[str, List[KritorHandler]] = {}
+        self.event_system = Broadcast()
+        self.running = True
         # Coroutines to be invoked when the event loop is shutting down.
         self._cleanup_coroutines = []
     
-    @class_property
-    def broadcast(cls) -> Broadcast:
-        """获取 Ariadne 的事件系统.
+    @property
+    def broadcast(self) -> Broadcast:
+        """获取事件系统.
 
         Returns:
             Broadcast: 事件系统
         """
-        return cls.broadcast
-
-    def register_handler(self, event_name: str, handler: Callable[[Any], Any]) -> str:
-        if event_name not in self.event_handlers:
-            self.event_handlers[event_name] = []
-        h = KritorHandler(handler)
-        self.event_handlers[event_name].append(h)
-        return h.get_handler_id()
-    
-    def remove_handler(self, handler_id: str):
-        for event_name, handlers in self.event_handlers.items():
-            i = 0
-            while i < len(handlers):
-                if handlers[i].get_handler_id() == handler_id:
-                    del handlers[i]
-                    break
-                i += 1
-    
-    def clear_handlers(self, event_name: str) -> None:
-        if event_name in self.event_handlers:
-            self.event_handlers[event_name].clear()
-    
-    def on_core(self, fn: Callable[[Any], Any]) -> str:
-        return self.register_handler("core", fn)
-
-    def on_message(self, fn: Callable[[Any], Any]) -> str:
-        return self.register_handler("message", fn)
-
-    def on_notice(self, fn: Callable[[Any], Any]) -> str:
-        return self.register_handler("notice", fn)
-    
-    def on_request(self, fn: Callable[[Any], Any]) -> str:
-        return self.register_handler("request", fn)
+        return self.event_system
     
     def _call_event(self, event: str, args: List[Any], kargs: Dict[str, Any]):
         if event not in self.event_handlers:
@@ -163,59 +137,144 @@ class KritorApp(object):
         self._cleanup_coroutines.append(server_graceful_shutdown())
         await server.wait_for_termination()
     
-    def _serve_passive(self) -> None:
+    async def _broadcast_message(self, event: EventStructure):
+        message_chain = to_message_chain(event.message.elements)
+        sender = to_sender(event.message.contact, event.message.sender)
+        source = to_source(event.message)
+        if isinstance(sender, Friend):
+            await self.broadcast.postEvent(
+                FriendMessage(
+                    messageChain=message_chain,
+                    sender=sender,
+                    source=source,
+                    quote=None
+                )
+            )
+        elif isinstance(sender, Member):
+            await self.broadcast.postEvent(
+                GroupMessage(
+                    messageChain=message_chain,
+                    sender=sender,
+                    source=source,
+                    quote=None
+                )
+            )
+        elif isinstance(sender, Stranger):
+            await self.broadcast.postEvent(
+                StrangerMessage(
+                    messageChain=message_chain,
+                    sender=sender,
+                    source=source,
+                    quote=None
+                )
+            )
+    
+    def _thread_core_event(self):
         with grpc.insecure_channel(self.target) as channel:
             stub = EventServiceStub(channel)
-            
             core_event_list = stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_CORE_EVENT))
-            message_event_list = stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_MESSAGE))
-            notice_event_list = stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_NOTICE))
-            request_event_list = stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_REQUEST))
-
             core_event_iter = iter(core_event_list)
+            try:
+                while self.running:
+                    try:
+                        event: EventStructure = next(core_event_iter)
+                    except StopIteration:
+                        pass
+                    time.sleep(0.1)
+            except (KeyboardInterrupt, SystemExit):
+                return
+    
+    def _thread_message_event(self):
+        loop = asyncio.new_event_loop()
+        with grpc.insecure_channel(self.target) as channel:
+            stub = EventServiceStub(channel)
+            message_event_list = stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_MESSAGE))
             message_event_iter = iter(message_event_list)
+            try:
+                while self.running:
+                    try:
+                        event: EventStructure = next(message_event_iter)
+                        loop.run_until_complete(self._broadcast_message(event=event))
+                    except StopIteration:
+                        pass
+            except (KeyboardInterrupt, SystemExit):
+                return
+    
+    def _thread_notice_event(self):
+        with grpc.insecure_channel(self.target) as channel:
+            stub = EventServiceStub(channel)
+            notice_event_list = stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_NOTICE))
             notice_event_iter = iter(notice_event_list)
+            try:
+                while self.running:
+                    try:
+                        event: EventStructure = next(notice_event_iter)
+                    except StopIteration:
+                        pass
+                    time.sleep(0.1)
+            except (KeyboardInterrupt, SystemExit):
+                return
+    
+    def _thread_request_event(self):
+        with grpc.insecure_channel(self.target) as channel:
+            stub = EventServiceStub(channel)
+            request_event_list = stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_NOTICE))
             request_event_iter = iter(request_event_list)
-            while True:
-                try:
-                    event = next(core_event_iter)
-                    self._call_event("core", args=[], kargs={})
-                except StopIteration:
-                    pass
-                
-                try:
-                    event = next(message_event_iter)
-                    self._call_event("message", args=[], kargs={"message": event.message})
-                except StopIteration:
-                    pass
-                
-                try:
-                    event = next(notice_event_iter)
-                    self._call_event("notice", args=[], kargs={"notice": event.notice})
-                except StopIteration:
-                    pass
-                
-                try:
-                    event = next(request_event_iter)
-                    self._call_event("request", args=[], kargs={"request": event.request})
-                except StopIteration:
-                    pass
+            try:
+                while self.running:
+                    try:
+                        event: EventStructure = next(request_event_iter)
+                    except StopIteration:
+                        pass
+                    time.sleep(0.1)
+            except (KeyboardInterrupt, SystemExit):
+                return
+    
+    def _serve_passive(self) -> None:
+        core_t = Thread(target=self._thread_core_event, args=[], daemon=True)
+        message_t = Thread(target=self._thread_message_event, args=[], daemon=True)
+        notice_t = Thread(target=self._thread_notice_event, args=[], daemon=True)
+        request_t = Thread(target=self._thread_request_event, args=[], daemon=True)
 
+        threads = [core_t, message_t, notice_t, request_t]
+
+        # Start all threads.
+        for t in threads:
+            t.start()
+
+        try:
+            while True:
                 time.sleep(0.1)
+        except (KeyboardInterrupt, SystemExit):
+            self.running = False
+            # Wait for all threads to finish.
+            for t in threads:
+                t.join(timeout=3)
+                if t.is_alive():
+                    print("Threading join timeout.")
 
     async def _aserve_passive(self) -> None:
-        async with grpc.aio.insecure_channel(self.target) as channel:
-            stub = EventServiceStub(channel)
+        core_t = Thread(target=self._thread_core_event, args=[], daemon=True)
+        message_t = Thread(target=self._thread_message_event, args=[], daemon=True)
+        notice_t = Thread(target=self._thread_notice_event, args=[], daemon=True)
+        request_t = Thread(target=self._thread_request_event, args=[], daemon=True)
+
+        threads = [core_t, message_t, notice_t, request_t]
+
+        # Start all threads.
+        for t in threads:
+            t.start()
+
+        try:
             while True:
-                event_list = await stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_CORE_EVENT))
-                for event in event_list:
-                    await self._acall_event("core", args=[], kargs={})
-                
-                event_list = await stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_MESSAGE))
-                for event in event_list:
-                    await self._acall_event("message", args=[], kargs={"message": event.message})
-                
                 await asyncio.sleep(0.1)
+        except (KeyboardInterrupt, SystemExit):
+            self.running = False
+            # Wait for all threads to finish.
+            for t in threads:
+                t.join(timeout=3)
+                if t.is_alive():
+                    print("Threading join timeout.")
 
     def run(self, host: str, port: int) -> None:
         self._run_info(host=host, port=port)
@@ -227,7 +286,7 @@ class KritorApp(object):
     async def arun(self, host: str, port: int) -> None:
         self._run_info(host=host, port=port)
         if self.passive:
-            await self._serve_passive()
+            await self._aserve_passive()
         else:
             await self._aserve_active(host=host, port=port)
     
@@ -243,6 +302,15 @@ class KritorApp(object):
                 loop.close()
     
     # Auth
+    def authenticate(self, account: str, ticket: str) -> bool:
+        with grpc.insecure_channel(self.target) as channel:
+            stub = AuthenticationServiceStub(channel)
+            out: GetAuthenticationStateResponse = stub.GetAuthenticationState(GetAuthenticationStateRequest(account = account))
+            if out.is_required:
+                out = stub.Authenticate(AuthenticateRequest(account = account, ticket = ticket))
+                return False
+            return out.is_required
+
     def auth(self, account: str, ticket: str) -> AuthenticateResponse:
         with grpc.insecure_channel(self.target) as channel:
             stub = AuthenticationServiceStub(channel)
@@ -262,9 +330,36 @@ class KritorApp(object):
             return out
     
     # Message
-    def send_message(self) -> SendMessageResponse:
+    def send_message(self, target: Union[Friend, Group], message: Union[MessageChain, str], retry_count:int = 3) -> SendMessageResponse:
         with grpc.insecure_channel(self.target) as channel:
             stub = MessageServiceStub(channel)
-            contact = Contact(scene=0, peer="")
-            out = stub.SendMessage(SendMessageRequest(contact = contact, elements = [Element(type=0, text=TextElement(text="你好，世界"))], retry_count=3))
+            contact = to_contact(target)
+            if isinstance(message, str):
+                elements = [Element(type=Element.ElementType.TEXT, text=TextElement(text=message))]
+            else:
+                elements = to_message(message)
+            out = stub.SendMessage(
+                SendMessageRequest(
+                    contact = contact,
+                    elements = elements,
+                    retry_count=retry_count
+                )
+            )
+            return out
+
+    async def asend_message(self, target: Union[Friend, Group], message: Union[MessageChain, str], retry_count:int = 3) -> SendMessageResponse:
+        async with grpc.aio.insecure_channel(self.target) as channel:
+            stub = MessageServiceStub(channel)
+            contact = to_contact(target)
+            if isinstance(message, str):
+                elements = [Element(type=Element.ElementType.TEXT, text=TextElement(text=message))]
+            else:
+                elements = to_message(message)
+            out = await stub.SendMessage(
+                SendMessageRequest(
+                    contact = contact,
+                    elements = elements,
+                    retry_count=retry_count
+                )
+            )
             return out

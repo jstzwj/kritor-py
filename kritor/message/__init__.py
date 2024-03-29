@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from .chain import MessageChain
 
 
-@internal_cls()
 class Source(KritorBaseModel):
     """表示消息在一个特定聊天区域内的唯一标识"""
 
@@ -36,8 +35,6 @@ class Source(KritorBaseModel):
 
         return (await Ariadne.current().get_message_from_id(self.id)).message_chain
 
-
-@internal_cls()
 class Quote(KritorBaseModel):
     """表示消息中回复其他消息/用户的部分, 通常包含一个完整的消息链(`origin` 属性)"""
 

@@ -24,17 +24,24 @@ with grpc.insecure_channel(self.target) as channel:
 ```python
 from kritor.app import KritorApp
 from kritor.connection.config import config
-from kritor.models import Friend
+from kritor.event.message import GroupMessage
+from kritor.models.relationship import Group
 
-app = KritorApp(config(verify_key="ServiceVerifyKey", account=123456789))
+app = KritorApp(
+    account="114514",
+    ticket="ServiceVerifyKey",
+    host="127.0.0.1",
+    port=5700,
+    server_host="0.0.0.0",
+    server_port=5090,
+    passive=True
+)
 
+@app.broadcast.receiver("GroupMessage")
+async def group_message_listener(message: GroupMessage, group: Group):
+    print(message.message_chain.display)
 
-@app.broadcast.receiver("FriendMessage")
-async def friend_message_listener(app: Ariadne, friend: Friend):
-    await app.send_message(friend, "Hello, World!")
-
-
-KritorApp.launch_blocking()
+app.launch_blocking(sync=True)
 ```
 
 

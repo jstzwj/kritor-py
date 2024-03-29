@@ -3,10 +3,10 @@
 import asyncio
 import contextlib
 
-from graia.broadcast import Broadcast
-from graia.broadcast.entities.dispatcher import BaseDispatcher as AbstractDispatcher
-from graia.broadcast.entities.signatures import Force
-from graia.broadcast.interfaces.dispatcher import DispatcherInterface
+from kritor.broadcast import Broadcast
+from kritor.broadcast.entities.dispatcher import BaseDispatcher as AbstractDispatcher
+from kritor.broadcast.entities.signatures import Force
+from kritor.broadcast.interfaces.dispatcher import DispatcherInterface
 
 from .message.chain import MessageChain
 from .message.element import Quote, Source

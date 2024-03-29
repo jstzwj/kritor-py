@@ -1,11 +1,12 @@
 """Ariadne 消息事件"""
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 from pydantic import Field, root_validator
 
 from graia.amnesia.message import Element
-from graia.broadcast.interfaces.dispatcher import DispatcherInterface
+from kritor.broadcast.interfaces.dispatcher import DispatcherInterface
 
+from kritor.broadcast.entities.dispatcher import BaseDispatcher as AbstractDispatcher
 from ..dispatcher import (
     BaseDispatcher,
     MessageChainDispatcher,
@@ -46,7 +47,7 @@ def _set_source_quote(_, values: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class MessageEvent(KritorEvent):
-    """Ariadne 消息事件基类"""
+    """消息事件基类"""
 
     type: str = "MessageEvent"
 
@@ -62,7 +63,7 @@ class MessageEvent(KritorEvent):
     quote: Optional[Quote] = None
     """可能的引用消息对象"""
 
-    __source_quote_setter = root_validator(pre=True, allow_reuse=True)(_set_source_quote)
+    # __source_quote_setter = root_validator(pre=True, allow_reuse=True)(_set_source_quote)
 
     def __int__(self):
         return self.id
@@ -71,9 +72,10 @@ class MessageEvent(KritorEvent):
     def id(self) -> int:
         return self.source.id
 
-    class Dispatcher(BaseDispatcher):
+    class MessageDispatcher(BaseDispatcher):
         mixin = [MessageChainDispatcher, SourceDispatcher, QuoteDispatcher, SenderDispatcher]
 
+    Dispatcher: Type[AbstractDispatcher] = MessageDispatcher
 
 class FriendMessage(MessageEvent, FriendEvent):
     """好友消息"""
@@ -98,12 +100,13 @@ class GroupMessage(MessageEvent, GroupEvent):
     sender: Member
     """发送者"""
 
-    class Dispatcher(MessageEvent.Dispatcher):
+    class GroupDispatcher(MessageEvent.MessageDispatcher):
         @staticmethod
         async def catch(interface: DispatcherInterface):
             if isinstance(interface.event, GroupMessage) and generic_issubclass(Group, interface.annotation):
                 return interface.event.sender.group
-
+    
+    Dispatcher: Type[AbstractDispatcher] = GroupDispatcher
 
 class TempMessage(MessageEvent):
     """临时消息"""
@@ -116,7 +119,7 @@ class TempMessage(MessageEvent):
     sender: Member
     """发送者"""
 
-    class Dispatcher(MessageEvent.Dispatcher):
+    class Dispatcher(MessageEvent.MessageDispatcher):
         @staticmethod
         async def catch(interface: DispatcherInterface):
             if isinstance(interface.event, TempMessage) and generic_issubclass(Group, interface.annotation):
@@ -176,9 +179,10 @@ class ActiveMessage(KritorEvent):
     def id(self) -> int:
         return self.source.id
 
-    class Dispatcher(BaseDispatcher):
+    class ActiveMessageDispatcher(BaseDispatcher):
         mixin = [MessageChainDispatcher, SourceDispatcher, QuoteDispatcher, SubjectDispatcher]
 
+    Dispatcher: Type[AbstractDispatcher] = ActiveMessageDispatcher
 
 class ActiveFriendMessage(ActiveMessage):
     """主动好友消息"""
@@ -215,12 +219,13 @@ class ActiveTempMessage(ActiveMessage):
     subject: Member
     """消息接收者"""
 
-    class Dispatcher(ActiveMessage.Dispatcher):
+    class ActiveTempMessageDispatcher(ActiveMessage.ActiveMessageDispatcher):
         @staticmethod
         async def catch(interface: DispatcherInterface):
             if isinstance(interface.event, ActiveTempMessage) and interface.annotation is Group:
                 return interface.event.subject.group
 
+    Dispatcher: Type[AbstractDispatcher] = ActiveTempMessageDispatcher
 
 class ActiveStrangerMessage(ActiveMessage):
     """主动陌生人消息"""
