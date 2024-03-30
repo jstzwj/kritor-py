@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import logging
+from queue import Queue
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Union
 import uuid
 import grpc
@@ -9,6 +10,8 @@ from threading import Thread
 from concurrent import futures
 
 from kritor.bridge.message import to_message_chain, to_sender, to_source, to_contact, to_message
+from kritor.broadcast.entities.event import Dispatchable
+from kritor.event.lifecycle import ApplicationLaunch, ApplicationShutdown
 
 from .broadcast import Broadcast
 from .broadcast.interfaces.dispatcher import DispatcherInterface
@@ -77,9 +80,16 @@ class KritorApp(object):
         self.target = f"{host}:{port}"
 
         self.event_system = Broadcast()
+        self.event_queue = Queue()
         self.running = True
         # Coroutines to be invoked when the event loop is shutting down.
         self._cleanup_coroutines = []
+    
+    def start(self):
+        self.running = True
+
+    def close(self):
+        self.running = False
     
     @property
     def broadcast(self) -> Broadcast:
@@ -90,21 +100,8 @@ class KritorApp(object):
         """
         return self.event_system
     
-    def _call_event(self, event: str, args: List[Any], kargs: Dict[str, Any]):
-        if event not in self.event_handlers:
-            return
-        for handler in self.event_handlers[event]:
-            if handler.is_sync:
-                handler.call(*args, **kargs)
-    
-    async def _acall_event(self, event: str, args: List[Any], kargs: Dict[str, Any]):
-        if event not in self.event_handlers:
-            return
-        for handler in self.event_handlers[event]:
-            if handler.is_sync:
-                handler.call(*args, **kargs)
-            else:
-                await handler.acall(*args, **kargs)
+    def post_event(self, event: Dispatchable, upper_event: Optional[Dispatchable] = None):
+        self.event_queue.put((event, upper_event))
     
     def _run_info(self, host: str, port: int, debug=False):
         lines = []
@@ -137,12 +134,12 @@ class KritorApp(object):
         self._cleanup_coroutines.append(server_graceful_shutdown())
         await server.wait_for_termination()
     
-    async def _broadcast_message(self, event: EventStructure):
+    def _broadcast_message(self, event: EventStructure):
         message_chain = to_message_chain(event.message.elements)
         sender = to_sender(event.message.contact, event.message.sender)
         source = to_source(event.message)
         if isinstance(sender, Friend):
-            await self.broadcast.postEvent(
+            self.post_event(
                 FriendMessage(
                     messageChain=message_chain,
                     sender=sender,
@@ -151,7 +148,7 @@ class KritorApp(object):
                 )
             )
         elif isinstance(sender, Member):
-            await self.broadcast.postEvent(
+            self.post_event(
                 GroupMessage(
                     messageChain=message_chain,
                     sender=sender,
@@ -160,7 +157,7 @@ class KritorApp(object):
                 )
             )
         elif isinstance(sender, Stranger):
-            await self.broadcast.postEvent(
+            self.post_event(
                 StrangerMessage(
                     messageChain=message_chain,
                     sender=sender,
@@ -185,7 +182,6 @@ class KritorApp(object):
                 return
     
     def _thread_message_event(self):
-        loop = asyncio.new_event_loop()
         with grpc.insecure_channel(self.target) as channel:
             stub = EventServiceStub(channel)
             message_event_list = stub.RegisterActiveListener(RequestPushEvent(type=EventType.EVENT_TYPE_MESSAGE))
@@ -194,7 +190,7 @@ class KritorApp(object):
                 while self.running:
                     try:
                         event: EventStructure = next(message_event_iter)
-                        loop.run_until_complete(self._broadcast_message(event=event))
+                        self._broadcast_message(event=event)
                     except StopIteration:
                         pass
             except (KeyboardInterrupt, SystemExit):
@@ -242,11 +238,14 @@ class KritorApp(object):
         for t in threads:
             t.start()
 
+        loop = asyncio.get_event_loop()
         try:
-            while True:
-                time.sleep(0.1)
+            while self.running:
+                event = self.event_queue.get()
+                loop.run_until_complete(self.broadcast.postEvent(event=event[0], upper_event=event[1]))
+                time.sleep(0.01)
         except (KeyboardInterrupt, SystemExit):
-            self.running = False
+            self.close()
             # Wait for all threads to finish.
             for t in threads:
                 t.join(timeout=3)
@@ -266,8 +265,10 @@ class KritorApp(object):
             t.start()
 
         try:
-            while True:
-                await asyncio.sleep(0.1)
+            while self.running:
+                event = self.event_queue.get()
+                self.broadcast.postEvent(event=event[0], upper_event=event[1])
+                await asyncio.sleep(0.01)
         except (KeyboardInterrupt, SystemExit):
             self.running = False
             # Wait for all threads to finish.
@@ -291,6 +292,7 @@ class KritorApp(object):
             await self._aserve_active(host=host, port=port)
     
     def launch_blocking(self, sync=True):
+        self.post_event(ApplicationLaunch(self))
         if sync:
             self.run(self.server_host, self.server_port)
         else:
@@ -300,7 +302,7 @@ class KritorApp(object):
             finally:
                 loop.run_until_complete(*self._cleanup_coroutines)
                 loop.close()
-    
+        self.post_event(ApplicationShutdown(self))
     # Auth
     def authenticate(self, account: str, ticket: str) -> bool:
         with grpc.insecure_channel(self.target) as channel:

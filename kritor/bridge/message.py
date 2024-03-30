@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Union
 from kritor.message import Source
 from kritor.message.chain import MessageChain
-from kritor.message.element import Plain, At, AtAll
+from kritor.message.element import Plain, At, AtAll, Face, Quote, Image
 from kritor.models.relationship import (
     Client,
     Friend,
@@ -20,6 +20,12 @@ from kritor.protos.common.message_element_pb2 import (
     BubbleFaceElement,
     ReplyElement,
     ImageElement,
+    VoiceElement,
+    VideoElement,
+    BasketballElement,
+    DiceElement,
+    RpsElement,
+    PokeElement,
 )
 from kritor.protos.common.contact_pb2 import Contact, Sender, Scene
 
@@ -55,7 +61,7 @@ def to_message_chain(elements: List[Element]) -> MessageChain:
         elif data_field == "face":  # element.type == Element.ElementType.FACE
             message_chain.content.append(
                 FaceElement(
-                    target=element.face.id,
+                    id=element.face.id,
                     is_big=element.face.is_big,
                     result=element.face.result,
                 )
@@ -107,6 +113,18 @@ def to_message(chain: MessageChain) -> List[Element]:
 def to_sender(
     contact: Contact, sender: Sender
 ) -> Union[Friend, Member, Client, Stranger]:
+    """这里有bug，kritor的element.scene永远为0，这里workaround想办法
+
+    Args:
+        contact (Contact): _description_
+        sender (Sender): _description_
+
+    Raises:
+        NotImplementedError: _description_
+
+    Returns:
+        Union[Friend, Member, Client, Stranger]: _description_
+    """
     if contact.scene == Scene.GROUP:
         group = Group(id=int(contact.peer), name="", permission=MemberPerm.Member)
         return Member(

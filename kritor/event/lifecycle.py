@@ -1,4 +1,4 @@
-"""Ariadne, Adapter 生命周期相关事件"""
+"""生命周期相关事件"""
 import typing
 
 from kritor.broadcast.entities.event import Dispatchable
@@ -8,24 +8,24 @@ from ..dispatcher import BaseDispatcher
 from ..typing import generic_issubclass
 
 if typing.TYPE_CHECKING:
-    from ..app import Ariadne
+    from ..app import KritorApp
 
 
 class ApplicationLifecycleEvent(Dispatchable):
-    """指示有关应用 (Ariadne) 的事件."""
+    """指示有关应用的事件."""
 
-    app: "Ariadne"
+    app: "KritorApp"
 
-    def __init__(self, app: "Ariadne") -> None:
+    def __init__(self, app: "KritorApp") -> None:
         self.app = app
 
     class Dispatcher(BaseDispatcher):
         @staticmethod
         async def catch(interface: "DispatcherInterface"):
-            from ..app import Ariadne
+            from ..app import KritorApp
 
             if isinstance(interface.event, ApplicationLifecycleEvent) and generic_issubclass(
-                Ariadne, interface.annotation
+                KritorApp, interface.annotation
             ):
                 return interface.event.app
 
