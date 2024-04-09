@@ -2,7 +2,20 @@ from datetime import datetime
 from typing import List, Union
 from kritor.message import Source
 from kritor.message.chain import MessageChain
-from kritor.message.element import Plain, At, AtAll, Face, Quote, Image
+from kritor.message.element import (
+    Plain,
+    At,
+    AtAll,
+    Face,
+    Quote,
+    Image,
+    Forward,
+    File,
+    MultimediaElement,
+    FlashImage,
+    Voice,
+    Video,
+)
 from kritor.models.relationship import (
     Client,
     Friend,
@@ -80,7 +93,9 @@ def to_message_chain(elements: List[Element]) -> MessageChain:
                     is_big=element.face.is_big,
                 )
             )
-        elif data_field == "bubble_face":  # element.type == Element.ElementType.BUBBLE_FACE
+        elif (
+            data_field == "bubble_face"
+        ):  # element.type == Element.ElementType.BUBBLE_FACE
             message_chain.content.append(
                 BubbleFaceElement(
                     target=element.bubble_face.id,
@@ -125,6 +140,104 @@ def to_message_chain(elements: List[Element]) -> MessageChain:
                 )
             else:
                 raise Exception("Unsupported image type.")
+        elif data_field == "voice":
+            voice_data_field = element.voice.WhichOneof("data")
+            if voice_data_field == "file":
+                message_chain.content.append(
+                    Voice(
+                        id=element.voice.file_md5,
+                        data_bytes=element.voice.file,
+                    )
+                )
+            elif voice_data_field == "file_name":
+                message_chain.content.append(
+                    Voice(
+                        id=element.voice.file_md5,
+                        path=element.voice.file_path,
+                    )
+                )
+            elif voice_data_field == "file_path":
+                message_chain.content.append(
+                    Voice(
+                        id=element.voice.file_md5,
+                        path=element.voice.file_path,
+                    )
+                )
+            elif voice_data_field == "file_url":
+                message_chain.content.append(
+                    Voice(
+                        id=element.voice.file_md5,
+                        url=element.voice.file_url,
+                    )
+                )
+            else:
+                raise Exception("Unsupported voice type.")
+        elif data_field == "video":
+            video_data_field = element.video.WhichOneof("data")
+            if video_data_field == "file":
+                message_chain.content.append(
+                    Video(
+                        id=element.video.file_md5,
+                        data_bytes=element.video.file,
+                    )
+                )
+            elif video_data_field == "file_name":
+                message_chain.content.append(
+                    Video(
+                        id=element.video.file_md5,
+                        path=element.video.file_path,
+                    )
+                )
+            elif video_data_field == "file_path":
+                message_chain.content.append(
+                    Video(
+                        id=element.video.file_md5,
+                        path=element.video.file_path,
+                    )
+                )
+            elif video_data_field == "file_url":
+                message_chain.content.append(
+                    Video(
+                        id=element.video.file_md5,
+                        url=element.video.file_url,
+                    )
+                )
+            else:
+                raise Exception("Unsupported video type.")
+        elif data_field == "basketball":
+            pass
+        elif data_field == "dice":
+            pass
+        elif data_field == "rps":
+            pass
+        elif data_field == "poke":
+            pass
+        elif data_field == "music":
+            pass
+        elif data_field == "weather":
+            pass
+        elif data_field == "location":
+            pass
+        elif data_field == "share":
+            pass
+        elif data_field == "gift":
+            pass
+        elif data_field == "market_face":
+            pass
+        elif data_field == "forward":
+            pass
+        elif data_field == "contact":
+            pass
+        elif data_field == "json":
+            pass
+        elif data_field == "xml":
+            pass
+        elif data_field == "file":
+            pass
+        elif data_field == "markdown":
+            pass
+        elif data_field == "button":
+            pass
         else:
             pass
             # raise NotImplementedError()
@@ -141,8 +254,22 @@ def to_message(chain: MessageChain) -> List[Element]:
         elif element.type == "AtAll":
             pass
         elif element.type == "Face":
+            message.append(
+                FaceElement(id=element.face_id, is_big=False, result=element.name)
+            )
+        elif element.type == "Xml":
             pass
-        elif element.type == "MarketFace":
+        elif element.type == "Json":
+            pass
+        elif element.type == "App":
+            pass
+        elif element.type == "Poke":
+            pass
+        elif element.type == "Dice":
+            pass
+        elif element.type == "MusicShare":
+            pass
+        elif element.type == "Forward":
             pass
         else:
             raise NotImplementedError()

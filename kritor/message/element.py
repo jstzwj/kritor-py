@@ -596,16 +596,6 @@ class File(Element):
     def as_persistent_string(self) -> str:
         return ""
 
-
-class MiraiCode(Element):
-    """Mirai 码, 并不建议直接使用. Ariadne 也不会提供互转换接口."""
-
-    type: str = "MiraiCode"
-
-    code: str
-    """Mirai Code"""
-
-
 class ImageType(Enum):
     """Image 类型的枚举."""
 
@@ -826,4 +816,30 @@ class Voice(MultimediaElement):
 
     def __str__(self) -> str:
         return "[语音]"
+
+
+class Video(MultimediaElement):
+    """指示消息中的视频元素"""
+
+    type: str = "Video"
+
+    id: Optional[str] = Field(None, alias="videoId")
+
+    def __init__(
+        self,
+        id: Optional[str] = None,
+        url: Optional[str] = None,
+        *,
+        path: Optional[Union[Path, str]] = None,
+        base64: Optional[str] = None,
+        data_bytes: Union[None, bytes, BytesIO] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(id=id, url=url, path=path, base64=base64, data_bytes=data_bytes, **kwargs)
+
+    length: Optional[int]
+    """视频长度"""
+
+    def __str__(self) -> str:
+        return "[视频]"
 
