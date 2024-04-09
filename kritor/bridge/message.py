@@ -26,6 +26,19 @@ from kritor.protos.common.message_element_pb2 import (
     DiceElement,
     RpsElement,
     PokeElement,
+    MusicElement,
+    WeatherElement,
+    LocationElement,
+    ShareElement,
+    GiftElement,
+    MarketFaceElement,
+    ForwardElement,
+    ContactElement,
+    JsonElement,
+    XmlElement,
+    FileElement,
+    MarkdownElement,
+    ButtonElement,
 )
 from kritor.protos.common.contact_pb2 import Contact, Sender, Scene
 
@@ -60,10 +73,11 @@ def to_message_chain(elements: List[Element]) -> MessageChain:
             message_chain.content.append(At(target=element.at.uin))
         elif data_field == "face":  # element.type == Element.ElementType.FACE
             message_chain.content.append(
-                FaceElement(
+                Face(
                     id=element.face.id,
+                    face_id=element.face.result,
+                    name=None,
                     is_big=element.face.is_big,
-                    result=element.face.result,
                 )
             )
         elif data_field == "bubble_face":  # element.type == Element.ElementType.BUBBLE_FACE
@@ -75,23 +89,42 @@ def to_message_chain(elements: List[Element]) -> MessageChain:
             )
         elif data_field == "reply":  # element.type == Element.ElementType.REPLY
             message_chain.content.append(
-                ReplyElement(
-                    message_id=element.reply.message_id,
+                Quote(
+                    id=int(element.reply.message_id),
                 )
             )
         elif data_field == "image":  # element.type == Element.ElementType.IMAGE
             image_data_field = element.image.WhichOneof("data")
-            message_chain.content.append(
-                ImageElement(
-                    file=element.image.file if image_data_field == "file" else None,
-                    file_name=element.image.file_name if image_data_field == "file_name" else None,
-                    file_path=element.image.file_path if image_data_field == "file_path" else None,
-                    file_url=element.image.file_url if image_data_field == "file_url" else None,
-                    file_md5=element.image.file_md5,
-                    sub_type=element.image.sub_type,
-                    type=element.image.type,
+            if image_data_field == "file":
+                message_chain.content.append(
+                    Image(
+                        id=element.image.file_md5,
+                        data_bytes=element.image.file,
+                    )
                 )
-            )
+            elif image_data_field == "file_name":
+                message_chain.content.append(
+                    Image(
+                        id=element.image.file_md5,
+                        path=element.image.file_path,
+                    )
+                )
+            elif image_data_field == "file_path":
+                message_chain.content.append(
+                    Image(
+                        id=element.image.file_md5,
+                        path=element.image.file_path,
+                    )
+                )
+            elif image_data_field == "file_url":
+                message_chain.content.append(
+                    Image(
+                        id=element.image.file_md5,
+                        url=element.image.file_url,
+                    )
+                )
+            else:
+                raise Exception("Unsupported image type.")
         else:
             pass
             # raise NotImplementedError()
@@ -105,6 +138,12 @@ def to_message(chain: MessageChain) -> List[Element]:
             message.append(TextElement(text=element.text))
         elif element.type == "At":
             message.append(AtElement(target=element.at.uid))
+        elif element.type == "AtAll":
+            pass
+        elif element.type == "Face":
+            pass
+        elif element.type == "MarketFace":
+            pass
         else:
             raise NotImplementedError()
     return message

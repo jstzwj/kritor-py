@@ -36,30 +36,12 @@ class Source(KritorBaseModel):
         return (await Ariadne.current().get_message_from_id(self.id)).message_chain
 
 class Quote(KritorBaseModel):
-    """表示消息中回复其他消息/用户的部分, 通常包含一个完整的消息链(`origin` 属性)"""
+    """表示消息中回复其他消息/用户的部分"""
 
     type: str = "Quote"
 
     id: int
     """引用的消息 ID"""
-
-    group_id: int = Field(..., alias="groupId")
-    """引用消息所在群号 (好友消息为 0)"""
-
-    sender_id: int = Field(..., alias="senderId")
-    """发送者 QQ 号"""
-
-    target_id: int = Field(..., alias="targetId")
-    """原消息的接收者QQ号 (或群号) """
-
-    origin: "MessageChain"
-    """原来的消息链"""
-
-    @validator("origin", pre=True, allow_reuse=True)
-    def _(cls, v):
-        from .chain import MessageChain
-
-        return MessageChain(v)  # no need to parse objects, they are universal!
 
     def as_persistent_string(self) -> str:
         return ""

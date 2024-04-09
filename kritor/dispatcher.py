@@ -46,24 +46,6 @@ class ContextDispatcher(AbstractDispatcher):
         if generic_issubclass(Ariadne, interface.annotation):
             return Ariadne.current()
 
-
-class LaunartInterfaceDispatcher(AbstractDispatcher):
-    @staticmethod
-    async def catch(interface: DispatcherInterface):
-        from graia.ariadne.typing import Unions, get_args, get_origin
-
-        if isinstance(interface.annotation, type) and issubclass(interface.annotation, ExportInterface):
-            manager = Launart.current()
-            with contextlib.suppress(ValueError):
-                return manager.get_interface(interface.annotation)
-        elif get_origin(interface.annotation) in Unions and (types := get_args(interface.annotation)):
-            manager = Launart.current()
-            for anno in types:
-                if isinstance(anno, type) and issubclass(anno, ExportInterface):
-                    with contextlib.suppress(ValueError):
-                        return manager.get_interface(anno)
-
-
 class NoneDispatcher(AbstractDispatcher):
     """给 Optional[...] 提供 None 的 Dispatcher"""
 
