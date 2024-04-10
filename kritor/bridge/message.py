@@ -51,7 +51,7 @@ from kritor.protos.common.message_element_pb2 import (
     XmlElement,
     FileElement,
     MarkdownElement,
-    ButtonElement,
+    KeyboardElement,
 )
 from kritor.protos.common.contact_pb2 import Contact, Sender, Scene
 
