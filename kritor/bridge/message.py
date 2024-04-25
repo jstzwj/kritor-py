@@ -1,12 +1,14 @@
 from datetime import datetime
-from typing import List, Union
+from typing import Any, List, Type, Union
 from kritor.message import Source
 from kritor.message.chain import MessageChain
 from kritor.message.element import (
     Plain,
     At,
     AtAll,
+    Dice,
     Face,
+    Poke,
     Quote,
     Image,
     Forward,
@@ -15,6 +17,7 @@ from kritor.message.element import (
     FlashImage,
     Voice,
     Video,
+    
 )
 from kritor.models.relationship import (
     Client,
@@ -64,6 +67,31 @@ def to_contact(target: Union[Friend, Group]) -> Contact:
     else:
         raise NotImplementedError()
 
+def to_multimedia(multimedia_type: str, multimedia_class: Type, element_field: Any):
+    out = None
+    if multimedia_type == "file":
+        out = multimedia_class(
+            id=element_field.file_md5,
+            data_bytes=element_field.file,
+        )
+    elif multimedia_type == "file_name":
+        out = multimedia_class(
+            id=element_field.file_md5,
+            path=element_field.file_path,
+        )
+    elif multimedia_type == "file_path":
+        out = multimedia_class(
+            id=element_field.file_md5,
+            path=element_field.file_path,
+        )
+    elif multimedia_type == "file_url":
+        out = multimedia_class(
+            id=element_field.file_md5,
+            url=element_field.file_url,
+        )
+    else:
+        raise Exception(f"Unsupported {multimedia_class} type.")
+    return out
 
 def to_message_chain(elements: List[Element]) -> MessageChain:
     """这里有bug，kritor的element.type永远为0，这里workaround想办法
@@ -110,108 +138,22 @@ def to_message_chain(elements: List[Element]) -> MessageChain:
             )
         elif data_field == "image":  # element.type == Element.ElementType.IMAGE
             image_data_field = element.image.WhichOneof("data")
-            if image_data_field == "file":
-                message_chain.content.append(
-                    Image(
-                        id=element.image.file_md5,
-                        data_bytes=element.image.file,
-                    )
-                )
-            elif image_data_field == "file_name":
-                message_chain.content.append(
-                    Image(
-                        id=element.image.file_md5,
-                        path=element.image.file_path,
-                    )
-                )
-            elif image_data_field == "file_path":
-                message_chain.content.append(
-                    Image(
-                        id=element.image.file_md5,
-                        path=element.image.file_path,
-                    )
-                )
-            elif image_data_field == "file_url":
-                message_chain.content.append(
-                    Image(
-                        id=element.image.file_md5,
-                        url=element.image.file_url,
-                    )
-                )
-            else:
-                raise Exception("Unsupported image type.")
+            message_chain.content.append(to_multimedia(image_data_field, Image, element.image))
         elif data_field == "voice":
             voice_data_field = element.voice.WhichOneof("data")
-            if voice_data_field == "file":
-                message_chain.content.append(
-                    Voice(
-                        id=element.voice.file_md5,
-                        data_bytes=element.voice.file,
-                    )
-                )
-            elif voice_data_field == "file_name":
-                message_chain.content.append(
-                    Voice(
-                        id=element.voice.file_md5,
-                        path=element.voice.file_path,
-                    )
-                )
-            elif voice_data_field == "file_path":
-                message_chain.content.append(
-                    Voice(
-                        id=element.voice.file_md5,
-                        path=element.voice.file_path,
-                    )
-                )
-            elif voice_data_field == "file_url":
-                message_chain.content.append(
-                    Voice(
-                        id=element.voice.file_md5,
-                        url=element.voice.file_url,
-                    )
-                )
-            else:
-                raise Exception("Unsupported voice type.")
+            message_chain.content.append(to_multimedia(voice_data_field, Voice, element.voice))
         elif data_field == "video":
             video_data_field = element.video.WhichOneof("data")
-            if video_data_field == "file":
-                message_chain.content.append(
-                    Video(
-                        id=element.video.file_md5,
-                        data_bytes=element.video.file,
-                    )
-                )
-            elif video_data_field == "file_name":
-                message_chain.content.append(
-                    Video(
-                        id=element.video.file_md5,
-                        path=element.video.file_path,
-                    )
-                )
-            elif video_data_field == "file_path":
-                message_chain.content.append(
-                    Video(
-                        id=element.video.file_md5,
-                        path=element.video.file_path,
-                    )
-                )
-            elif video_data_field == "file_url":
-                message_chain.content.append(
-                    Video(
-                        id=element.video.file_md5,
-                        url=element.video.file_url,
-                    )
-                )
-            else:
-                raise Exception("Unsupported video type.")
+            message_chain.content.append(to_multimedia(video_data_field, Video, element.video))
         elif data_field == "basketball":
             pass
         elif data_field == "dice":
-            pass
+            message_chain.content.append(Dice(value=element.dice.id))
         elif data_field == "rps":
             pass
         elif data_field == "poke":
             pass
+            # message_chain.content.append(Poke(value=element.dice.id))
         elif data_field == "music":
             pass
         elif data_field == "weather":

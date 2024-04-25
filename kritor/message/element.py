@@ -64,7 +64,7 @@ class Element(KritorBaseModel, BaseElement):
                 separators=(",", ":"),
             )
         )
-        return f"[mirai:{self.type}:{data}]"
+        return f"[kritor:{self.type}:{data}]"
 
     def __repr_args__(self) -> "ReprArgs":
         return list(self.dict(exclude={"type"}).items())
@@ -555,7 +555,7 @@ class Forward(Element):
 
     def as_persistent_string(self) -> str:
         data: str = escape_bracket(f"[{','.join(node.json() for node in self.node_list)}]")
-        return f"[mirai:{self.type}:{data}]"
+        return f"[kritor:{self.type}:{data}]"
 
     @classmethod
     def parse_obj(cls, obj: Any) -> Self:
@@ -697,11 +697,11 @@ class MultimediaElement(Element):
                     separators=(",", ":"),
                 )
             )
-        return f"[mirai:{self.type}:{data}]"
+        return f"[kritor:{self.type}:{data}]"
 
     @property
     def uuid(self):
-        """多媒体元素的 uuid, 即元素在 mirai 内部的标识"""
+        """多媒体元素的 uuid, 即元素在 kritor 内部的标识"""
         return self.id.split(".")[0].strip("/{}").lower() if self.id else ""
 
     def __eq__(self, other: "MultimediaElement"):
