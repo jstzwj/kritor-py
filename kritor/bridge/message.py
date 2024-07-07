@@ -17,6 +17,7 @@ from kritor.message.element import (
     FlashImage,
     Voice,
     Video,
+    MusicShare,
     
 )
 from kritor.models.relationship import (
@@ -153,8 +154,10 @@ def to_message_chain(elements: List[Element]) -> MessageChain:
             pass
         elif data_field == "poke":
             pass
-            # message_chain.content.append(Poke(value=element.dice.id))
+            # TODO: poke id和poke method str对应起来
+            # message_chain.content.append(Poke(value=element.poke.id))
         elif data_field == "music":
+            # TODO
             pass
         elif data_field == "weather":
             pass
@@ -178,7 +181,7 @@ def to_message_chain(elements: List[Element]) -> MessageChain:
             pass
         elif data_field == "markdown":
             pass
-        elif data_field == "button":
+        elif data_field == "keyboard":
             pass
         else:
             pass
